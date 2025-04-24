@@ -50,11 +50,20 @@ public class LevelLightEngine implements LightEventListener {
 
     @Override
     public boolean hasLightWork() {
+        if (!SodiumExtraClientMod.options().renderSettings.lightUpdates) {
+            return false;
+        }
+
         return this.skyEngine != null && this.skyEngine.hasLightWork() ? true : this.blockEngine != null && this.blockEngine.hasLightWork();
     }
 
     @Override
     public int runLightUpdates() {
+        // SodiumExtra
+        if (!SodiumExtraClientMod.options().renderSettings.lightUpdates) {
+            return 0;
+        }
+
         int i = 0;
         if (this.blockEngine != null) {
             i += this.blockEngine.runLightUpdates();
@@ -62,11 +71,6 @@ public class LevelLightEngine implements LightEventListener {
 
         if (this.skyEngine != null) {
             i += this.skyEngine.runLightUpdates();
-        }
-
-        // SodiumExtra
-        if (!SodiumExtraClientMod.options().renderSettings.lightUpdates) {
-            return 0;
         }
 
         return i;
