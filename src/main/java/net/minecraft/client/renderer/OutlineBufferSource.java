@@ -1,0 +1,149 @@
+package net.minecraft.client.renderer;
+
+import com.mojang.blaze3d.vertex.*;
+
+import java.util.Optional;
+
+import lombok.experimental.Accessors;
+import net.caffeinemc.sodium.api.util.ColorARGB;
+import net.caffeinemc.sodium.api.vertex.attributes.common.ColorAttribute;
+import net.caffeinemc.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.minecraft.util.ARGB;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import org.lwjgl.system.MemoryStack;
+
+@OnlyIn(Dist.CLIENT)
+public class OutlineBufferSource implements MultiBufferSource {
+    private final MultiBufferSource.BufferSource bufferSource;
+    private final MultiBufferSource.BufferSource outlineBufferSource = MultiBufferSource.immediate(new ByteBufferBuilder(1536));
+    private int teamR = 255;
+    private int teamG = 255;
+    private int teamB = 255;
+    private int teamA = 255;
+
+    public OutlineBufferSource(MultiBufferSource.BufferSource p_109927_) {
+        this.bufferSource = p_109927_;
+    }
+
+    @Override
+    public VertexConsumer getBuffer(RenderType p_109935_) {
+        if (p_109935_.isOutline()) {
+            VertexConsumer vertexconsumer2 = this.outlineBufferSource.getBuffer(p_109935_);
+            return new OutlineBufferSource.EntityOutlineGenerator(vertexconsumer2, this.teamR, this.teamG, this.teamB, this.teamA);
+        } else {
+            VertexConsumer vertexconsumer = this.bufferSource.getBuffer(p_109935_);
+            Optional<RenderType> optional = p_109935_.outline();
+            if (optional.isPresent()) {
+                VertexConsumer vertexconsumer1 = this.outlineBufferSource.getBuffer(optional.get());
+                OutlineBufferSource.EntityOutlineGenerator outlinebuffersource$entityoutlinegenerator = new OutlineBufferSource.EntityOutlineGenerator(
+                    vertexconsumer1, this.teamR, this.teamG, this.teamB, this.teamA
+                );
+                return VertexMultiConsumer.create(outlinebuffersource$entityoutlinegenerator, vertexconsumer);
+            } else {
+                return vertexconsumer;
+            }
+        }
+    }
+
+    public void setColor(int p_109930_, int p_109931_, int p_109932_, int p_109933_) {
+        this.teamR = p_109930_;
+        this.teamG = p_109931_;
+        this.teamB = p_109932_;
+        this.teamA = p_109933_;
+    }
+
+    public void endOutlineBatch() {
+        this.outlineBufferSource.endBatch();
+    }
+
+    @Accessors(fluent = true)
+    @OnlyIn(Dist.CLIENT)
+    static class EntityOutlineGenerator implements VertexConsumer, VertexBufferWriter {
+
+        VertexConsumer delegate;
+        int color;
+
+        // Sodium
+        private boolean canUseIntrinsics;
+
+        public EntityOutlineGenerator(VertexConsumer delegate, int color) {
+            this.delegate = delegate;
+            this.color = color;
+
+            // Sodium
+            this.canUseIntrinsics = VertexBufferWriter.tryOf(this.delegate) != null;
+        }
+
+        public EntityOutlineGenerator(VertexConsumer p_109943_, int p_109944_, int p_109945_, int p_109946_, int p_109947_) {
+            this(p_109943_, ARGB.color(p_109947_, p_109944_, p_109945_, p_109946_));
+        }
+
+        @Override
+        public VertexConsumer addVertex(float p_342958_, float p_343747_, float p_344781_) {
+            this.delegate.addVertex(p_342958_, p_343747_, p_344781_).setColor(this.color);
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setColor(int p_343483_, int p_343623_, int p_342060_, int p_342967_) {
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv(float p_342182_, float p_342633_) {
+            this.delegate.setUv(p_342182_, p_342633_);
+            return this;
+        }
+
+        // Sodium
+        @Override
+        public boolean canUseIntrinsics() {
+            return canUseIntrinsics;
+        }
+
+        @Override
+        public void push(MemoryStack stack, long ptr, int count, VertexFormat format) {
+            transform(ptr, count, format,
+                    this.color);
+
+            VertexBufferWriter.of(this.delegate)
+                    .push(stack, ptr, count, format);
+        }
+        // Sodium end
+
+        /**
+         * Transforms the color element of each vertex to use the specified value.
+         *
+         * @param ptr    The buffer of vertices to transform
+         * @param count  The number of vertices to transform
+         * @param format The format of the vertices
+         * @param color  The packed color to use for transforming the vertices
+         */
+        private static void transform(long ptr, int count, VertexFormat format,
+                                      int color) {
+            long stride = format.getVertexSize();
+            long offsetColor = format.getOffset(VertexFormatElement.COLOR);
+
+            for (int vertexIndex = 0; vertexIndex < count; vertexIndex++) {
+                ColorAttribute.set(ptr + offsetColor, ColorARGB.toABGR(color));
+                ptr += stride;
+            }
+        }
+
+        @Override
+        public VertexConsumer setUv1(int p_344004_, int p_342637_) {
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setUv2(int p_343797_, int p_342797_) {
+            return this;
+        }
+
+        @Override
+        public VertexConsumer setNormal(float p_343114_, float p_344978_, float p_343069_) {
+            return this;
+        }
+    }
+}

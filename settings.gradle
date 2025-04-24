@@ -1,0 +1,4 @@
+rootProject.name = 'MCP-1.21.4-Sodium'
+
+include ':mcp'
+project(":mcp").projectDir = file("projects/mcp")
